@@ -31,6 +31,12 @@ case class Maze(
     row <- cells.lift(i)
     value <- row.lift(j)
   } yield value
+
+  override def toString: String = cells
+    .map { row =>
+      row.mkString(" ")
+    }
+    .mkString("\n")
 }
 
 object Maze {
@@ -40,6 +46,7 @@ object Maze {
   }
   case object Empty extends Cell {
     def binaryValue: Int = -1
+    override def toString: String = " "
   }
   case class Claimed(label: Int) extends Cell {
     assert(label >= 0)
@@ -47,6 +54,7 @@ object Maze {
   }
   case object Wall extends Cell {
     def binaryValue: Int = -2
+    override def toString: String = "#"
   }
 
   def fill(n: Int, m: Int)(element: Cell = Empty): Maze = {
@@ -59,10 +67,7 @@ object Maze {
 
   def save(file: File)(maze: Maze): Try[Unit] = Try {
     val writer = new PrintWriter(file)
-    maze.cells.foreach { row =>
-      val rowStr = row.map(_.toString).mkString(" ")
-      writer.println(rowStr)
-    }
+    writer.write(maze.toString)
     writer.close()
   }
 
@@ -70,8 +75,8 @@ object Maze {
     Try(Source.fromFile(file)).map { source =>
       val cells = source.getLines.toVector.map { rawRow =>
         rawRow.split(" ").toVector.map { cellStr =>
-          if (cellStr.toInt == Wall.binaryValue) Wall
-          else if (cellStr.toInt == Empty.binaryValue) Empty
+          if (cellStr == Wall.toString) Wall
+          else if (cellStr == Empty.toString) Empty
           else Claimed(cellStr.toInt)
         }
       }
