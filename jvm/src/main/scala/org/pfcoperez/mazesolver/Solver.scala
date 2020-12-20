@@ -65,7 +65,7 @@ object Solver {
     }
   }
 
-  def solve(input: Maze): Solution = {
+  def initialConditions(input: Maze): StepResult = {
     implicit val intOrder = fromOrdering[Int]
 
     def isPosition(value: Maze.Cell) =
@@ -88,7 +88,15 @@ object Solver {
 
     val initialtTerritories = DisjointSets(positionToDoor.values.toSeq: _*)
 
-    ???
+    StepResult(
+      initialtTerritories,
+      positionToDoor.foldLeft(input) { case (maze, ((i, j), door)) =>
+        maze.update(i, j)(Claimed(door)).getOrElse(maze)
+      },
+      positionToDoor.view.toList.map { case (position, door) =>
+        Scout(position, door)
+      }
+    )
   }
 
 }
