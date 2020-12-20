@@ -18,10 +18,17 @@ lazy val mazesolver = crossProject(JSPlatform, JVMPlatform)
   )
   .jvmSettings(
     // Add JVM-specific settings here
-    libraryDependencies ++= Seq(
-      //"org.typelevel" %% "cats-core" % "2.1.1",
-      "org.typelevel" %% "cats-collections-core" % "0.7.0"
-    )
+    libraryDependencies ++= {
+      val akkaVersion = "2.6.10"
+      val akkaHttpVersion = "10.2.2"
+      Seq(
+        //"org.typelevel" %% "cats-core" % "2.1.1",
+        "org.typelevel" %% "cats-collections-core" % "0.7.0",
+        "com.typesafe.akka" %% "akka-actor" % akkaVersion,
+        "com.typesafe.akka" %% "akka-stream" % akkaVersion,
+        "com.typesafe.akka" %% "akka-http" % akkaHttpVersion
+      )
+    }
   )
   .jsSettings(
     // Add JS-specific settings here
