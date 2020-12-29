@@ -44,6 +44,13 @@ object Maze {
     def binaryValue: Int
     override def toString: String = binaryValue.toString
   }
+  object Cell {
+    def apply(cellStr: String): Cell = {
+      if (cellStr == Wall.toString) Wall
+      else if (cellStr == Empty.toString) Empty
+      else Claimed(cellStr.toInt)
+    }
+  }
   case object Empty extends Cell {
     def binaryValue: Int = -1
     override def toString: String = " "
@@ -71,22 +78,18 @@ object Maze {
     writer.close()
   }
 
-  def load(file: File): Try[Maze] = {
-    Try(Source.fromFile(file)).map { source =>
-      val cells = source.getLines.toVector.map { rawRow =>
-        rawRow.split(" ").toVector.map { cellStr =>
-          if (cellStr == Wall.toString) Wall
-          else if (cellStr == Empty.toString) Empty
-          else Claimed(cellStr.toInt)
-        }
+  def fromLines(lines: Seq[String]): Try[Maze] = {
+    val cells = lines.toVector.map { rawRow =>
+      rawRow.split(" ").toVector.map(Cell.apply)
+    }
+    val loadedMaze = Maze(cells)
+    val wrongRows = loadedMaze.cells.zipWithIndex
+      .collect {
+        case (row, line) if row.size != loadedMaze.m =>
+          s"Line [$line] has [${row.size}] when first line determined m=[${loadedMaze.m}]"
       }
-      val loadedMaze = Maze(cells)
-      val wrongRows = loadedMaze.cells.zipWithIndex
-        .collect {
-          case (row, line) if row.size != loadedMaze.m =>
-            s"Line [$line] has [${row.size}] when first line determined m=[${loadedMaze.m}]"
-        }
 
+    Try {
       assert(
         wrongRows.isEmpty,
         s"All rows must have the same size:\n${wrongRows.mkString("\n")}"
@@ -95,4 +98,9 @@ object Maze {
       loadedMaze
     }
   }
+
+  def load(file: File): Try[Maze] = for {
+    source <- Try(Source.fromFile(file))
+    result <- fromLines(source.getLines().toSeq)
+  } yield result
 }
