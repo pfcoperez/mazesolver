@@ -50,12 +50,16 @@ object Server extends App {
       case textMessage: TextMessage =>
         val requestStream: Source[Request, _] = textMessage.textStream
           .fold(Vector.empty[String]) { case (lines, line) =>
-            lines :+ line.trim
+            lines :+ line
           }
           .map { requestLines =>
             requestLines.mkString("\n") match {
               case Request(rq) => rq
-              case _           => InvalidRequest
+              case _ =>
+                System.err.println(
+                  s"Invalid request:\n>${requestLines.mkString("\n")}<"
+                )
+                InvalidRequest
             }
           }
 
@@ -69,7 +73,7 @@ object Server extends App {
           case _ => Source.single[Response](InvalidRequest)
         }
 
-        TextMessage(responseStream.map(_.toString))
+        TextMessage(responseStream.map(response => s"$response\n"))
 
       case binaryMessage: BinaryMessage =>
         binaryMessage.dataStream.runWith(Sink.ignore)
@@ -102,7 +106,7 @@ object Server extends App {
       private val GenerateRegex =
         "generate ([0-9]+) ([0-9]+) ([0-9]+) ([0-9]+)".r
       private val SolveRegex =
-        """solve(\s[0-9]+)?\n(((\s*[0-9#]+)+\n)+)""".r
+        """solve(\s[0-9]+)?\n((([#.]+\s*)+\n)+)""".r
 
       def unapply(rawRequest: String): Option[Request] = {
         Some(rawRequest).collect {

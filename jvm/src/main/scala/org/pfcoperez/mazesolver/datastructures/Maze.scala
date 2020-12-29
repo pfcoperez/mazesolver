@@ -53,7 +53,7 @@ object Maze {
   }
   case object Empty extends Cell {
     def binaryValue: Int = -1
-    override def toString: String = " "
+    override def toString: String = "."
   }
   case class Claimed(label: Int) extends Cell {
     assert(label >= 0)
