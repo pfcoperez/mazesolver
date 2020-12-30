@@ -113,19 +113,26 @@ object Server extends App {
       private val GenerateRegex =
         "generate ([0-9]+) ([0-9]+) ([0-9]+) ([0-9]+)".r
       private val SolveRegex =
-        """solve(\s[0-9]+)?\n((([#.]+\s*)+\n)+)""".r
+        """solve(\s[0-9]+)?""".r
 
       def unapply(rawRequest: String): Option[Request] = {
-        Some(rawRequest).collect {
-          case "noop" => NoOp
+        Some(rawRequest).flatMap {
+          case "noop" => Some(NoOp)
           case GenerateRegex(nStr, mStr, doorsStr, depthStr) =>
-            Generate(nStr.toInt, mStr.toInt, doorsStr.toInt, depthStr.toInt)
-          case SolveRegex(maybeMaxItsStr, _, stageStr, _) =>
-            val maybeMaxIterations = for {
-              str <- Option(maybeMaxItsStr)
-              limit <- Try(str.trim.toInt).toOption
-            } yield limit
-            Solve(stageStr, maybeMaxIterations)
+            Some(
+              Generate(nStr.toInt, mStr.toInt, doorsStr.toInt, depthStr.toInt)
+            )
+          case solveStr: String =>
+            val tokenized = solveStr.split("\n")
+            tokenized.headOption.flatMap { case SolveRegex(maybeMaxItsStr) =>
+              val maybeMaxIterations = for {
+                str <- Option(maybeMaxItsStr)
+                limit <- Try(str.trim.toInt).toOption
+              } yield limit
+              tokenized.tail.headOption.map { _ =>
+                Solve(tokenized.tail.mkString("\n"), maybeMaxIterations)
+              }
+            }
         }
       }
     }
