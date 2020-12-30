@@ -38,7 +38,10 @@ object Solver {
         val maybeEvent = stage.get(i, j).collect {
           case Empty =>
             Claim(scoutPosition, territory)
-          case Claimed(ownerTerritory) if ownerTerritory != territory =>
+          case Claimed(ownerTerritory)
+              if territories
+                .find(ownerTerritory)
+                ._2 != territories.find(territory)._2 =>
             Fusion(ownerTerritory, territory)
         }
 
