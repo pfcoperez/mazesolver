@@ -46,7 +46,7 @@ object Server extends App {
   }
 
   def wsServerFlow: Flow[Message, Message, Any] = {
-    Flow[Message].map {
+    Flow[Message].flatMapConcat {
       case textMessage: TextMessage =>
         val requestStream: Source[Request, _] = textMessage.textStream
           .fold(Vector.empty[String]) { case (lines, line) =>
@@ -74,15 +74,11 @@ object Server extends App {
           case _ => Source.single[Response](InvalidRequest)
         }
 
-        TextMessage(responseStream.map { response =>
-          val res = s"$response\n"
-          //println(s">>>>> RESP >>>> $res")
-          res
-        })
+        responseStream.map(response => TextMessage(s"$response\n"))
 
       case binaryMessage: BinaryMessage =>
         binaryMessage.dataStream.runWith(Sink.ignore)
-        TextMessage(InvalidRequest.toString)
+        Source.single(TextMessage(InvalidRequest.toString))
     }
   }
 
