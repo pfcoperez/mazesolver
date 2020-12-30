@@ -36,8 +36,9 @@ object Solver {
       case Nil => previousState -> None
       case Scout(scoutPosition @ (i, j), territory) :: remaining =>
         val maybeEvent = stage.get(i, j).collect {
-          case Empty => Claim(scoutPosition, territory)
-          case Claimed(ownerTerritory) =>
+          case Empty =>
+            Claim(scoutPosition, territory)
+          case Claimed(ownerTerritory) if ownerTerritory != territory =>
             Fusion(ownerTerritory, territory)
         }
 
@@ -55,12 +56,18 @@ object Solver {
           }
           .getOrElse(stage)
 
+        val nextToExplore = maybeEvent.map { _ =>
+          List((i, j + 1), (i, j - 1), (i + 1, j), (i - 1, j))
+            .collect {
+              case pos @ (i, j) if stage.get(i, j).exists(_ == Empty) =>
+                Scout(pos, territory)
+            }
+        } getOrElse Nil
+
         previousState.copy(
           territories = updatedTerritories,
           stage = updatedStage,
-          toExplore =
-            remaining ::: List((i, j + 1), (i, j - 1), (i + 1, j), (i - 1, j))
-              .map(Scout(_, territory))
+          toExplore = remaining ::: nextToExplore
         ) -> maybeEvent
     }
   }
@@ -90,9 +97,10 @@ object Solver {
 
     StepResult(
       initialtTerritories,
-      positionToDoor.foldLeft(input) { case (maze, ((i, j), door)) =>
+      /*positionToDoor.foldLeft(input) { case (maze, ((i, j), door)) =>
         maze.update(i, j)(Claimed(door)).getOrElse(maze)
-      },
+      }*/
+      input,
       positionToDoor.view.toList.map { case (position, door) =>
         Scout(position, door)
       }

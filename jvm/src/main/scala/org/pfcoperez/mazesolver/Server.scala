@@ -68,12 +68,17 @@ object Server extends App {
           case Generate(n, m, doors, depth) =>
             Source.single[Response](Stage(Generator(n, m, doors, depth)))
           case problem: Solve =>
+            // println(s"Solving:\n$problem")
             solutionsStream(problem).map(SolutionEvent.apply)
 
           case _ => Source.single[Response](InvalidRequest)
         }
 
-        TextMessage(responseStream.map(response => s"$response\n"))
+        TextMessage(responseStream.map { response =>
+          val res = s"$response\n"
+          //println(s">>>>> RESP >>>> $res")
+          res
+        })
 
       case binaryMessage: BinaryMessage =>
         binaryMessage.dataStream.runWith(Sink.ignore)
@@ -83,14 +88,20 @@ object Server extends App {
 
   def solutionsStream(problem: Solve): Source[Event, _] = {
     val Success(maze) = Maze.fromLines(problem.maze.split("\n")) //TODO: Unsafe
-    val solutionsStream =
-      Source.unfold[StepResult, Event](Solver.initialConditions(maze)) {
-        state: StepResult =>
-          val (updatedState, maybeEvent) = Solver.explorationStep(state)
-          maybeEvent.map { event =>
-            updatedState -> event
-          }
+    def solutionStep(state: StepResult): Option[(StepResult, Event)] = {
+      val (updatedState, maybeEvent) = Solver.explorationStep(state)
+      // println(updatedState.toExplore.map(_.position))
+      maybeEvent match {
+        case Some(event) => Some(updatedState -> event)
+        case None if updatedState.toExplore.nonEmpty =>
+          solutionStep(updatedState)
+        case _ => None
       }
+    }
+    val solutionsStream =
+      Source.unfold[StepResult, Event](Solver.initialConditions(maze))(
+        solutionStep
+      )
     problem.maybeMaxIterations
       .map(maxIterations => solutionsStream.take(maxIterations.toLong))
       .getOrElse(solutionsStream)
@@ -116,7 +127,7 @@ object Server extends App {
           case SolveRegex(maybeMaxItsStr, _, stageStr, _) =>
             val maybeMaxIterations = for {
               str <- Option(maybeMaxItsStr)
-              limit <- Try(str.toInt).toOption
+              limit <- Try(str.trim.toInt).toOption
             } yield limit
             Solve(stageStr, maybeMaxIterations)
         }
