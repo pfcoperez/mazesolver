@@ -28,3 +28,4 @@ project/plugins/project/
 # Metals & Bloop
 .metals
 .bloop
+.bsp
