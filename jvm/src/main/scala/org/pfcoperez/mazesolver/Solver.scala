@@ -7,6 +7,7 @@ import cats.Order.fromOrdering
 import org.pfcoperez.mazesolver.datastructures.Maze.Empty
 import org.pfcoperez.mazesolver.datastructures.Maze.Wall
 import org.pfcoperez.mazesolver.datastructures.Maze.Claimed
+import org.pfcoperez.mazesolver.model.Events._
 
 object Solver {
 
@@ -21,11 +22,6 @@ object Solver {
   ) {
     def explorationFinished: Boolean = toExplore.isEmpty
   }
-
-  sealed trait Event
-  case class Claim(position: (Int, Int), territory: Int) extends Event
-  case class Fusion(territoryA: Int, territoryB: Int) extends Event
-  case object ExplorarionFinished extends Event
 
   def explorationStep(
       previousState: StepResult

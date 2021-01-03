@@ -20,10 +20,10 @@ import akka.stream.scaladsl.Source
 import akka.NotUsed
 import org.pfcoperez.mazesolver.datastructures.Maze
 import org.pfcoperez.mazesolver.Solver.StepResult
-import org.pfcoperez.mazesolver.Solver.Event
+import org.pfcoperez.mazesolver.model.Events._
+import org.pfcoperez.mazesolver.model.Protocol._
 
 object Server extends App {
-  import Server.WSEntities._
 
   implicit val system = ActorSystem("server-system")
 
@@ -105,56 +105,4 @@ object Server extends App {
 
   val bindingFuture: Future[ServerBinding] =
     Http().bindAndHandle(route, "localhost", 8080)
-
-  object WSEntities {
-    sealed trait Request
-    object Request {
-
-      private val GenerateRegex =
-        "generate ([0-9]+) ([0-9]+) ([0-9]+) ([0-9]+)".r
-      private val SolveRegex =
-        """solve(\s[0-9]+)?""".r
-
-      def unapply(rawRequest: String): Option[Request] = {
-        Some(rawRequest).flatMap {
-          case "noop" => Some(NoOp)
-          case GenerateRegex(nStr, mStr, doorsStr, depthStr) =>
-            Some(
-              Generate(nStr.toInt, mStr.toInt, doorsStr.toInt, depthStr.toInt)
-            )
-          case solveStr: String =>
-            val tokenized = solveStr.split("\n")
-            tokenized.headOption.flatMap { case SolveRegex(maybeMaxItsStr) =>
-              val maybeMaxIterations = for {
-                str <- Option(maybeMaxItsStr)
-                limit <- Try(str.trim.toInt).toOption
-              } yield limit
-              tokenized.tail.headOption.map { _ =>
-                Solve(tokenized.tail.mkString("\n"), maybeMaxIterations)
-              }
-            }
-        }
-      }
-    }
-
-    case object NoOp extends Request
-    case class Generate(n: Int, m: Int, doorsPerSide: Int, depth: Int)
-        extends Request
-
-    case class Solve(
-        maze: String,
-        maybeMaxIterations: Option[Int]
-    ) extends Request
-
-    sealed trait Response
-
-    case object InvalidRequest extends Response with Request
-    case object Ack extends Response
-    case class Stage(maze: Maze) extends Response {
-      override def toString: String = s"stage\n$maze"
-    }
-    case class SolutionEvent(event: Event) extends Response {
-      override def toString: String = event.toString
-    }
-  }
 }
