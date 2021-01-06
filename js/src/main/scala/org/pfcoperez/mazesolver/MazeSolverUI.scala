@@ -22,22 +22,22 @@ object MazeSolverUI {
     }
   }
 
-  def renderMaze(renderContext: Ctx2D)(maze: Maze): Unit = {
-    val cellH = renderContext.canvas.height / maze.n
-    val cellW = renderContext.canvas.width / maze.m
+  def renderChange(
+      renderContext: Ctx2D
+  )(n: Int, m: Int, i: Int, j: Int, cell: Cell): Unit = {
+    val cellH = renderContext.canvas.height / n
+    val cellW = cellH
 
+    renderContext.fillStyle = colorCode(cell)
+    renderContext.fillRect(j * cellW, i * cellH, cellW, cellH)
+  }
+
+  def renderMaze(renderContext: Ctx2D)(maze: Maze): Unit = {
     for {
       i <- (0 until maze.n)
       j <- (0 until maze.m)
       cell <- maze.get(i, j)
-    } {
-      renderContext.fillStyle = colorCode(cell)
-      renderContext.fillRect(j * cellW, i * cellH, cellW, cellH)
-    }
-  }
-
-  def renderEvent(renderContext: Ctx2D)(event: Event): Unit = {
-    ???
+    } renderChange(renderContext)(maze.n, maze.m, i, j, cell)
   }
 
   def main(args: Array[String]): Unit = {
@@ -70,6 +70,7 @@ object MazeSolverUI {
     val nInput =
       dom.document.createElement("input").asInstanceOf[Input]
     nInput.`type` = "number"
+    nInput.width = "15"
     nInput.min = "1"
     nInput.defaultValue = "50"
     controlPaneDiv.appendChild(nInput)
@@ -77,6 +78,7 @@ object MazeSolverUI {
     val mInput =
       dom.document.createElement("input").asInstanceOf[Input]
     mInput.`type` = "number"
+    mInput.width = "15"
     mInput.min = "1"
     mInput.defaultValue = "50"
     controlPaneDiv.appendChild(mInput)
@@ -84,6 +86,7 @@ object MazeSolverUI {
     val depthInput =
       dom.document.createElement("input").asInstanceOf[Input]
     depthInput.`type` = "number"
+    depthInput.width = "15"
     depthInput.min = "0"
     depthInput.defaultValue = "70"
     controlPaneDiv.appendChild(depthInput)
@@ -91,6 +94,7 @@ object MazeSolverUI {
     val doorsInput =
       dom.document.createElement("input").asInstanceOf[Input]
     doorsInput.`type` = "number"
+    doorsInput.width = "15"
     doorsInput.min = "1"
     doorsInput.defaultValue = "2"
     controlPaneDiv.appendChild(doorsInput)
@@ -100,6 +104,12 @@ object MazeSolverUI {
     generateButton.textContent = "Generate"
     generateButton.disabled = true
     controlPaneDiv.appendChild(generateButton)
+
+    val solveButton =
+      dom.document.createElement("button").asInstanceOf[Button]
+    solveButton.textContent = "Solve"
+    solveButton.disabled = true
+    controlPaneDiv.appendChild(solveButton)
 
     val messageBox =
       dom.document.createElement("input").asInstanceOf[Input]
@@ -113,6 +123,7 @@ object MazeSolverUI {
     // State
 
     lazy val socket = new dom.WebSocket(serverUrlInput.value)
+    var maze: Option[Maze] = None
 
     // HTML event handlers
     connectButton.onclick = { _ =>
@@ -134,8 +145,23 @@ object MazeSolverUI {
 
         msgLines match {
           case "stage" :: mazeLines =>
-            Maze.fromLines(mazeLines).foreach { maze =>
-              renderMaze(renderContext)(maze)
+            Maze.fromLines(mazeLines).foreach { generated =>
+              maze = Some(generated)
+              renderMaze(renderContext)(maze.get)
+              solveButton.disabled = false
+            }
+          case Event(event) :: _ =>
+            event match {
+              case Claim((i, j), territory) =>
+                maze = maze.flatMap { maze =>
+                  val cell = Claimed(territory)
+                  renderChange(renderContext)(maze.n, maze.m, i, j, cell)
+                  maze.update(i, j)(cell)
+                }
+              case f: Fusion =>
+                showMessage(f.toString)
+              case ExplorarionFinished =>
+                showMessage("FINISHED")
             }
           case other :: _ =>
             showMessage(other)
@@ -153,6 +179,11 @@ object MazeSolverUI {
       socket.send(s"generate $n $m $maxSteps $nDoorsSide")
     }
 
-    //renderMaze(renderContext)(Maze.fill(100, 200)(Empty))
+    solveButton.onclick = { _ =>
+      maze.foreach { maze =>
+        val solveCommand = s"solve\n${maze.toString}\n"
+        socket.send(solveCommand)
+      }
+    }
   }
 }
