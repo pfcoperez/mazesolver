@@ -9,14 +9,15 @@ object Protocol {
   sealed trait Request
   object Request {
 
+    private val NoOpRegex = "noop\n*".r
     private val GenerateRegex =
-      "generate ([0-9]+) ([0-9]+) ([0-9]+) ([0-9]+)".r
+      "generate ([0-9]+) ([0-9]+) ([0-9]+) ([0-9]+)\n*".r
     private val SolveRegex =
       """solve(\s[0-9]+)?""".r
 
     def unapply(rawRequest: String): Option[Request] = {
       Some(rawRequest).flatMap {
-        case "noop" => Some(NoOp)
+        case NoOpRegex() => Some(NoOp)
         case GenerateRegex(nStr, mStr, doorsStr, depthStr) =>
           Some(
             Generate(nStr.toInt, mStr.toInt, doorsStr.toInt, depthStr.toInt)
