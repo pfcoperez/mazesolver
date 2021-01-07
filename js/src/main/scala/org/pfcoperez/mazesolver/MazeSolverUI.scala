@@ -25,7 +25,10 @@ object MazeSolverUI {
   def renderChange(
       renderContext: Ctx2D
   )(n: Int, m: Int, i: Int, j: Int, cell: Cell): Unit = {
-    val cellH = renderContext.canvas.height / n
+    val cellH = Math.min(
+      renderContext.canvas.height / n,
+      renderContext.canvas.width / m
+    )
     val cellW = cellH
 
     renderContext.fillStyle = colorCode(cell)
@@ -33,6 +36,14 @@ object MazeSolverUI {
   }
 
   def renderMaze(renderContext: Ctx2D)(maze: Maze): Unit = {
+    renderContext.fillStyle = "white"
+    renderContext.fillRect(
+      0,
+      0,
+      renderContext.canvas.width,
+      renderContext.canvas.height
+    )
+
     for {
       i <- (0 until maze.n)
       j <- (0 until maze.m)
