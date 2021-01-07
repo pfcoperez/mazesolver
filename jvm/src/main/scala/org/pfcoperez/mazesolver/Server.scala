@@ -53,7 +53,7 @@ object Server extends App {
             lines :+ line
           }
           .map { requestLines =>
-            requestLines.mkString("\n") match {
+            requestLines.mkString("") match {
               case Request(rq) => rq
               case _ =>
                 System.err.println(
@@ -68,7 +68,7 @@ object Server extends App {
           case Generate(n, m, doors, depth) =>
             Source.single[Response](Stage(Generator(n, m, doors, depth)))
           case problem: Solve =>
-            // println(s"Solving:\n$problem")
+            //println(s"Solving:\n>$problem<")
             solutionsStream(problem).map(SolutionEvent.apply)
 
           case _ => Source.single[Response](InvalidRequest)
@@ -101,6 +101,7 @@ object Server extends App {
     problem.maybeMaxIterations
       .map(maxIterations => solutionsStream.take(maxIterations.toLong))
       .getOrElse(solutionsStream)
+      .concat(Source.single(ExplorarionFinished))
   }
 
   val bindingFuture: Future[ServerBinding] =
