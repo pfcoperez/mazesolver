@@ -55,10 +55,21 @@ object Solver {
           }
           .getOrElse(stage)
 
+        def worthOfExploring(position: (Int, Int), cell: Cell): Boolean = {
+          cell match {
+            case Empty => true
+            case Claimed(otherTerritory) =>
+              (otherTerritory != territory) && (Math.abs(i - position._1) + Math
+                .abs(j - position._2) < 2)
+            case _ => false
+          }
+        }
+
         val nextToExplore = maybeEvent.map { _ =>
           List((i, j + 1), (i, j - 1), (i + 1, j), (i - 1, j))
             .collect {
-              case pos @ (i, j) if stage.get(i, j).exists(_ == Empty) =>
+              case pos @ (i, j)
+                  if stage.get(i, j).exists(worthOfExploring(pos, _)) =>
                 Scout(pos, territory)
             }
         } getOrElse Nil
@@ -81,13 +92,15 @@ object Solver {
       val isEmptyPosition = isPosition(Maze.Empty)
 
       val eastDoors =
-        (0 until input.n).map(i => (i, input.m - 1)).filter(isEmptyPosition)
+        (0 until (input.n - 1))
+          .map(i => (i, input.m - 1))
+          .filter(isEmptyPosition)
       val southDoors =
-        (0 until input.m).map(j => (input.n - 1, j)).filter(isEmptyPosition)
+        (1 until input.m).map(j => (input.n - 1, j)).filter(isEmptyPosition)
       val westDoors =
-        (0 until input.n).map(i => (i, 0)).filter(isEmptyPosition)
+        (1 until input.n).map(i => (i, 0)).filter(isEmptyPosition)
       val northDoors =
-        (0 until input.m).map(j => (0, j)).filter(isEmptyPosition)
+        (0 until (input.m - 1)).map(j => (0, j)).filter(isEmptyPosition)
 
       (eastDoors ++ southDoors ++ westDoors ++ northDoors).zipWithIndex.toMap
     }
