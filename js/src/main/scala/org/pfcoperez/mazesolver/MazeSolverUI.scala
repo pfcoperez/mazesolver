@@ -28,10 +28,8 @@ object MazeSolverUI {
       renderContext: Ctx2D,
       territoryColorMap: Map[Int, String]
   )(n: Int, m: Int, i: Int, j: Int, cell: Cell): Unit = {
-    val cellH = Math.min(
-      renderContext.canvas.height / n,
-      renderContext.canvas.width / m
-    )
+    val cellH =
+      Math.min(renderContext.canvas.height / n, renderContext.canvas.width / m)
     val cellW = cellH
 
     renderContext.fillStyle = colorCode(territoryColorMap)(cell)
@@ -83,8 +81,11 @@ object MazeSolverUI {
     val drawingCanvas =
       dom.document.createElement("canvas").asInstanceOf[Canvas]
     topLevelDiv.appendChild(drawingCanvas)
-    drawingCanvas.height = (dom.window.outerHeight * 0.8).toInt
-    drawingCanvas.width = (dom.window.outerWidth * 0.8).toInt
+    drawingCanvas.height = Math.min(
+      (dom.window.outerHeight * 0.8).toInt,
+      (dom.window.outerWidth * 0.8).toInt
+    )
+    drawingCanvas.width = drawingCanvas.height
     val renderContext = drawingCanvas.getContext("2d").asInstanceOf[Ctx2D]
 
     val serverUrlInput = dom.document.createElement("input").asInstanceOf[Input]
@@ -215,9 +216,9 @@ object MazeSolverUI {
                   .updated(territoryA, commonColor)
                   .updated(territoryB, commonColor)
 
-                renderMaze(renderContext, territoryToColorCode)(maze.get)
+                //renderMaze(renderContext, territoryToColorCode)(maze.get)
                 showMessage(f.toString)
-              case ExplorarionFinished =>
+              case ExplorationFinished =>
                 showMessage("FINISHED")
             }
           case other :: _ =>

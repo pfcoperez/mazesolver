@@ -19,6 +19,6 @@ object Events {
   }
   case class Claim(position: (Int, Int), territory: Int) extends Event
   case class Fusion(territoryA: Int, territoryB: Int) extends Event
-  case object ExplorarionFinished extends Event
+  case object ExplorationFinished extends Event
 
 }

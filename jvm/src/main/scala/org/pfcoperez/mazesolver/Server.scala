@@ -22,6 +22,7 @@ import org.pfcoperez.mazesolver.datastructures.Maze
 import org.pfcoperez.mazesolver.Solver.StepResult
 import org.pfcoperez.mazesolver.model.Events._
 import org.pfcoperez.mazesolver.model.Protocol._
+import cats.collections.DisjointSets
 
 object Server extends App {
 
@@ -84,24 +85,34 @@ object Server extends App {
 
   def solutionsStream(problem: Solve): Source[Event, _] = {
     val Success(maze) = Maze.fromLines(problem.maze.split("\n")) //TODO: Unsafe
-    def solutionStep(state: StepResult): Option[(StepResult, Event)] = {
+    def solutionStep(
+        state: StepResult
+    ): Option[(StepResult, (Event, DisjointSets[Int]))] = {
       val (updatedState, maybeEvent) = Solver.explorationStep(state)
       // println(updatedState.toExplore.map(_.position))
       maybeEvent match {
-        case Some(event) => Some(updatedState -> event)
+        case Some(event) =>
+          Some(updatedState -> (event, updatedState.territories))
         case None if updatedState.toExplore.nonEmpty =>
           solutionStep(updatedState)
         case _ => None
       }
     }
+
+    val initialConditions = Solver.initialConditions(maze)
+
     val solutionsStream =
-      Source.unfold[StepResult, Event](Solver.initialConditions(maze))(
+      Source.unfold[StepResult, (Event, DisjointSets[Int])](
+        initialConditions
+      )(
         solutionStep
       )
     problem.maybeMaxIterations
       .map(maxIterations => solutionsStream.take(maxIterations.toLong))
       .getOrElse(solutionsStream)
-      .concat(Source.single(ExplorarionFinished))
+      .map(Right(_._1))
+      .prepend(Source.single(Left(initialConditions.territories)))
+      .concat(Source.single(Right(ExplorationFinished)))
   }
 
   val bindingFuture: Future[ServerBinding] =
