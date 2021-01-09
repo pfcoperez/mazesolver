@@ -24,6 +24,8 @@ import org.pfcoperez.mazesolver.model.Events._
 import org.pfcoperez.mazesolver.model.Protocol._
 import cats.collections.DisjointSets
 
+import cats.Order.fromOrdering
+
 object Server extends App {
 
   implicit val system = ActorSystem("server-system")
@@ -101,6 +103,8 @@ object Server extends App {
 
     val initialConditions = Solver.initialConditions(maze)
 
+    implicit val pairsOrder = fromOrdering[(Int, Int)]
+
     val solutionsStream =
       Source.unfold[StepResult, (Event, DisjointSets[Int])](
         initialConditions
@@ -110,11 +114,38 @@ object Server extends App {
     problem.maybeMaxIterations
       .map(maxIterations => solutionsStream.take(maxIterations.toLong))
       .getOrElse(solutionsStream)
-      .map(Right(_._1))
-      .prepend(Source.single(Left(initialConditions.territories)))
-      .concat(Source.single(Right(ExplorationFinished)))
-  }
+      .mapConcat { entry =>
+        List(
+          Right[DisjointSets[Int], Event](entry._1),
+          Left[DisjointSets[Int], Event](entry._2)
+        )
+      }
+      .prepend(
+        Source.single(
+          Left[DisjointSets[Int], Event](initialConditions.territories)
+        )
+      )
+      .concat(
+        Source.single(
+          Right[DisjointSets[Int], Event](ExplorationFinished(List.empty))
+        )
+      )
+      .grouped(2)
+      .map {
+        case Seq(
+              Left(territories),
+              Right(finalization: ExplorationFinished)
+            ) =>
+          val equivalences: List[(Int, Int)] = for {
+            (parent, equivalences) <- territories.toSets._2.toList
+            territory <- equivalences.toList
+          } yield territory -> parent
 
+          ExplorationFinished(equivalences)
+        case Seq(Left(_), Right(event)) =>
+          event
+      }
+  }
   val bindingFuture: Future[ServerBinding] =
     Http().bindAndHandle(route, "localhost", 8080)
 }

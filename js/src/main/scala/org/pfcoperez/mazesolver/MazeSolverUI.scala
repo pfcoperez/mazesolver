@@ -218,8 +218,8 @@ object MazeSolverUI {
 
                 //renderMaze(renderContext, territoryToColorCode)(maze.get)
                 showMessage(f.toString)
-              case ExplorationFinished =>
-                showMessage("FINISHED")
+              case finished: ExplorationFinished =>
+                showMessage(finished.toString)
             }
           case other :: _ =>
             showMessage(other)

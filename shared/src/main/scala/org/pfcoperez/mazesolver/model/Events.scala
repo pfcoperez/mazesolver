@@ -9,6 +9,9 @@ object Events {
     private val FusionRegex =
       """Fusion\(([0-9]+),([0-9]+)\)""".r
 
+    private val ExplorationFinishedRegex =
+      """ExplorationFinished\(List\((\([0-9]+, [0-9]+\))*\)\)""".r
+
     def unapply(eventStr: String): Option[Event] = eventStr match {
       case ClaimRegex(iStr, jStr, territoryStr) =>
         Some(Claim((iStr.toInt, jStr.toInt), territoryStr.toInt))
@@ -19,6 +22,6 @@ object Events {
   }
   case class Claim(position: (Int, Int), territory: Int) extends Event
   case class Fusion(territoryA: Int, territoryB: Int) extends Event
-  case object ExplorationFinished extends Event
+  case class ExplorationFinished(equivalences: List[(Int, Int)]) extends Event
 
 }
