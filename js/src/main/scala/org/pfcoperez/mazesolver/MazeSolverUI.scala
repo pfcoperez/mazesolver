@@ -101,7 +101,7 @@ object MazeSolverUI {
     val nInput =
       dom.document.createElement("input").asInstanceOf[Input]
     nInput.`type` = "number"
-    nInput.width = "15"
+    nInput.max = "9999"
     nInput.min = "1"
     nInput.defaultValue = "50"
     controlPaneDiv.appendChild(nInput)
@@ -109,7 +109,7 @@ object MazeSolverUI {
     val mInput =
       dom.document.createElement("input").asInstanceOf[Input]
     mInput.`type` = "number"
-    mInput.width = "15"
+    mInput.max = "9999"
     mInput.min = "1"
     mInput.defaultValue = "50"
     controlPaneDiv.appendChild(mInput)
@@ -117,7 +117,7 @@ object MazeSolverUI {
     val depthInput =
       dom.document.createElement("input").asInstanceOf[Input]
     depthInput.`type` = "number"
-    depthInput.width = "15"
+    depthInput.max = "9999"
     depthInput.min = "0"
     depthInput.defaultValue = "70"
     controlPaneDiv.appendChild(depthInput)
@@ -125,7 +125,7 @@ object MazeSolverUI {
     val doorsInput =
       dom.document.createElement("input").asInstanceOf[Input]
     doorsInput.`type` = "number"
-    doorsInput.width = "15"
+    doorsInput.max = "9999"
     doorsInput.min = "1"
     doorsInput.defaultValue = "2"
     controlPaneDiv.appendChild(doorsInput)
@@ -146,6 +146,13 @@ object MazeSolverUI {
       dom.document.createElement("input").asInstanceOf[Input]
     messageBox.disabled = true
     controlPaneDiv.appendChild(messageBox)
+
+    val showUnifiedTerritoriesButton =
+      dom.document.createElement("button").asInstanceOf[Button]
+    showUnifiedTerritoriesButton.textContent =
+      "Explorarion finished. Click here to unveil solution"
+    showUnifiedTerritoriesButton.disabled = true
+    controlPaneDiv.appendChild(showUnifiedTerritoriesButton)
 
     def showMessage(msg: String): Unit = {
       messageBox.value = msg
@@ -216,10 +223,16 @@ object MazeSolverUI {
                   .updated(territoryA, commonColor)
                   .updated(territoryB, commonColor)
 
-                //renderMaze(renderContext, territoryToColorCode)(maze.get)
                 showMessage(f.toString)
-              case finished: ExplorationFinished =>
-                showMessage(finished.toString)
+              case ExplorationFinished(equivalences) =>
+                showUnifiedTerritoriesButton.disabled = false
+
+                territoryToColorCode = equivalences.map {
+                  case (territory, parent) =>
+                    territory -> territoryToColorCode(parent)
+                }.toMap
+
+                showMessage("FINISHED")
             }
           case other :: _ =>
             showMessage(other)
@@ -242,6 +255,12 @@ object MazeSolverUI {
         solveButton.disabled = true
         val solveCommand = s"solve\n${maze.toString}\n"
         socket.send(solveCommand)
+      }
+    }
+
+    showUnifiedTerritoriesButton.onclick = { _ =>
+      maze.foreach {
+        renderMaze(renderContext, territoryToColorCode)(_)
       }
     }
   }
