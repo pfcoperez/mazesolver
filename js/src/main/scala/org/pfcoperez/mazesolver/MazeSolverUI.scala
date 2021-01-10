@@ -189,6 +189,8 @@ object MazeSolverUI {
               maze = Some(generated)
               renderMaze(renderContext, territoryToColorCode)(generated)
               solveButton.disabled = false
+              showUnifiedTerritoriesButton.disabled = true
+              territoryToColorCode = Map.empty
             }
           case Event(event) :: _ =>
             event match {
