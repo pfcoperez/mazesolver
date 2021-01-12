@@ -19,16 +19,31 @@ import akka.stream.scaladsl.Sink
 import akka.stream.scaladsl.Source
 import akka.NotUsed
 import org.pfcoperez.mazesolver.datastructures.Maze
+import org.pfcoperez.mazesolver.datastructures.DisjointSetsWrapper
 import org.pfcoperez.mazesolver.Solver.StepResult
 import org.pfcoperez.mazesolver.model.Events._
 import org.pfcoperez.mazesolver.model.Protocol._
-import cats.collections.DisjointSets
-
-import cats.Order.fromOrdering
 
 object Server extends App {
 
   implicit val system = ActorSystem("server-system")
+
+  val port =
+    sys.env
+      .get("SOLVER_PORT")
+      .flatMap(portStr => Try(portStr.toInt).toOption)
+      .getOrElse(8080)
+
+  val useFakeDisjointSets = sys.env
+    .get("FAKE_DISJOINT")
+    .flatMap(str => Try(str.toBoolean).toOption)
+    .getOrElse(false)
+
+  val disjointSetsFactory = if (useFakeDisjointSets) {
+    DisjointSetsWrapper.createMutableBacked[Int](_)
+  } else {
+    DisjointSetsWrapper.createCatsBacked[Int](_)
+  }
 
   val route = path("generate") {
     parameter(
@@ -44,11 +59,15 @@ object Server extends App {
     }
   } ~ pathPrefix("ws") {
     path("solver") {
-      handleWebSocketMessages(wsServerFlow)
+      handleWebSocketMessages(
+        wsServerFlow(disjointSetsFactory)
+      )
     }
   }
 
-  def wsServerFlow: Flow[Message, Message, Any] = {
+  def wsServerFlow(
+      disjointSetsFactory: Seq[Int] => DisjointSetsWrapper[Int]
+  ): Flow[Message, Message, Any] = {
     Flow[Message].flatMapConcat {
       case textMessage: TextMessage =>
         val requestStream: Source[Request, _] = textMessage.textStream
@@ -71,8 +90,9 @@ object Server extends App {
           case Generate(n, m, doors, depth) =>
             Source.single[Response](Stage(Generator(n, m, doors, depth)))
           case problem: Solve =>
-            //println(s"Solving:\n>$problem<")
-            solutionsStream(problem).map(SolutionEvent.apply)
+            solutionsStream(problem)(disjointSetsFactory).map(
+              SolutionEvent.apply
+            )
 
           case _ => Source.single[Response](InvalidRequest)
         }
@@ -85,13 +105,15 @@ object Server extends App {
     }
   }
 
-  def solutionsStream(problem: Solve): Source[Event, _] = {
+  def solutionsStream(problem: Solve)(
+      disjointSetsFactory: Seq[Int] => DisjointSetsWrapper[Int]
+  ): Source[Event, _] = {
     val Success(maze) = Maze.fromLines(problem.maze.split("\n")) //TODO: Unsafe
     def solutionStep(
         state: StepResult
-    ): Option[(StepResult, (Event, DisjointSets[Int]))] = {
+    ): Option[(StepResult, (Event, DisjointSetsWrapper[Int]))] = {
       val (updatedState, maybeEvent) = Solver.explorationStep(state)
-      // println(updatedState.toExplore.map(_.position))
+
       maybeEvent match {
         case Some(event) =>
           Some(updatedState -> (event, updatedState.territories))
@@ -101,12 +123,14 @@ object Server extends App {
       }
     }
 
-    val initialConditions = Solver.initialConditions(maze)
+    val initialConditions = Solver.initialConditions(maze)(disjointSetsFactory)
 
-    implicit val pairsOrder = fromOrdering[(Int, Int)]
+    println(
+      s"INITIALIZED SOLVER ENGINE: ${initialConditions.territories.description}"
+    )
 
     val solutionsStream =
-      Source.unfold[StepResult, (Event, DisjointSets[Int])](
+      Source.unfold[StepResult, (Event, DisjointSetsWrapper[Int])](
         initialConditions
       )(
         solutionStep
@@ -116,18 +140,20 @@ object Server extends App {
       .getOrElse(solutionsStream)
       .mapConcat { entry =>
         List(
-          Right[DisjointSets[Int], Event](entry._1),
-          Left[DisjointSets[Int], Event](entry._2)
+          Right[DisjointSetsWrapper[Int], Event](entry._1),
+          Left[DisjointSetsWrapper[Int], Event](entry._2)
         )
       }
       .prepend(
         Source.single(
-          Left[DisjointSets[Int], Event](initialConditions.territories)
+          Left[DisjointSetsWrapper[Int], Event](initialConditions.territories)
         )
       )
       .concat(
         Source.single(
-          Right[DisjointSets[Int], Event](ExplorationFinished(List.empty))
+          Right[DisjointSetsWrapper[Int], Event](
+            ExplorationFinished(List.empty)
+          )
         )
       )
       .grouped(2)
@@ -147,5 +173,5 @@ object Server extends App {
       }
   }
   val bindingFuture: Future[ServerBinding] =
-    Http().bindAndHandle(route, "localhost", 8080)
+    Http().bindAndHandle(route, "localhost", port)
 }

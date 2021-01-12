@@ -1,22 +1,21 @@
 package org.pfcoperez.mazesolver
 
 import org.pfcoperez.mazesolver.datastructures.Maze
-import cats.collections.DisjointSets
 import org.pfcoperez.mazesolver.datastructures.Maze.Cell
-import cats.Order.fromOrdering
 import org.pfcoperez.mazesolver.datastructures.Maze.Empty
 import org.pfcoperez.mazesolver.datastructures.Maze.Wall
 import org.pfcoperez.mazesolver.datastructures.Maze.Claimed
 import org.pfcoperez.mazesolver.model.Events._
+import org.pfcoperez.mazesolver.datastructures.DisjointSetsWrapper
 
 object Solver {
 
-  case class Solution(claimed: Maze, territories: DisjointSets[Int])
+  case class Solution(claimed: Maze, territories: DisjointSetsWrapper[Int])
   case class Scout(position: (Int, Int), territory: Int) {
     assert(territory >= 0)
   }
   case class StepResult(
-      territories: DisjointSets[Int],
+      territories: DisjointSetsWrapper[Int],
       stage: Maze,
       toExplore: List[Scout]
   ) {
@@ -82,8 +81,9 @@ object Solver {
     }
   }
 
-  def initialConditions(input: Maze): StepResult = {
-    implicit val intOrder = fromOrdering[Int]
+  def initialConditions(
+      input: Maze
+  )(disjointSetsFactory: Seq[Int] => DisjointSetsWrapper[Int]): StepResult = {
 
     def isPosition(value: Maze.Cell) =
       (input.get _).tupled.andThen(_.exists(_ == value))
@@ -105,13 +105,10 @@ object Solver {
       (eastDoors ++ southDoors ++ westDoors ++ northDoors).zipWithIndex.toMap
     }
 
-    val initialtTerritories = DisjointSets(positionToDoor.values.toSeq: _*)
+    val initialTerritories = disjointSetsFactory(positionToDoor.values.toSeq)
 
     StepResult(
-      initialtTerritories,
-      /*positionToDoor.foldLeft(input) { case (maze, ((i, j), door)) =>
-        maze.update(i, j)(Claimed(door)).getOrElse(maze)
-      }*/
+      initialTerritories,
       input,
       positionToDoor.view.toList.map { case (position, door) =>
         Scout(position, door)
