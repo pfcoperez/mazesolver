@@ -30,21 +30,29 @@ object Solver {
     toExplore match {
       case Nil => previousState -> None
       case Scout(scoutPosition @ (i, j), territory) :: remaining =>
-        val maybeEvent = stage.get(i, j).collect {
-          case Empty =>
-            Claim(scoutPosition, territory)
-          case Claimed(ownerTerritory)
-              if territories
-                .find(ownerTerritory)
-                ._2 != territories.find(territory)._2 =>
-            Fusion(ownerTerritory, territory)
-        }
+        val (maybeEvent, optimizedTerritories) = stage
+          .get(i, j)
+          .collect {
+            case Empty =>
+              Some(Claim(scoutPosition, territory)) -> territories
+            case Claimed(ownerTerritory) =>
+              val (optimizedOnce, ownerParent) =
+                territories.find(ownerTerritory)
+              val (optimizedTwice, territoryParent) =
+                optimizedOnce.find(territory)
+
+              val result = if (ownerParent != territoryParent) {
+                Some(Fusion(ownerTerritory, territory))
+              } else None
+              result -> optimizedTwice
+          }
+          .getOrElse(None -> territories)
 
         val updatedTerritories = maybeEvent
           .collect { case Fusion(ownerTerritory, territory) =>
-            territories.union(ownerTerritory, territory)._1
+            optimizedTerritories.union(ownerTerritory, territory)._1
           }
-          .getOrElse(territories)
+          .getOrElse(optimizedTerritories)
 
         val updatedStage = maybeEvent
           .flatMap {
