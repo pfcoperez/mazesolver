@@ -27,18 +27,30 @@ object MazeSolverUI {
   def renderChange(
       renderContext: Ctx2D,
       territoryColorMap: Map[Int, String]
-  )(n: Int, m: Int, i: Int, j: Int, cell: Cell): Unit = {
-    val cellH =
-      Math.min(renderContext.canvas.height / n, renderContext.canvas.width / m)
-    val cellW = cellH
-
+  )(cellH: Int, cellW: Int, i: Int, j: Int, cell: Cell): Unit = {
     renderContext.fillStyle = colorCode(territoryColorMap)(cell)
     renderContext.fillRect(j * cellW, i * cellH, cellW, cellH)
   }
 
   def renderMaze(renderContext: Ctx2D, territoryColorMap: Map[Int, String])(
       maze: Maze
-  ): Unit = {
+  ): (Int, Int) = {
+
+    import maze.{n, m}
+
+    val cellH =
+      Math.max(
+        1,
+        Math.min(
+          renderContext.canvas.height / n,
+          renderContext.canvas.width / m
+        )
+      )
+    val cellW = cellH
+
+    renderContext.canvas.height = cellH * n
+    renderContext.canvas.width = cellH * m
+
     renderContext.fillStyle = "white"
     renderContext.fillRect(
       0,
@@ -51,7 +63,9 @@ object MazeSolverUI {
       i <- (0 until maze.n)
       j <- (0 until maze.m)
       cell <- maze.get(i, j)
-    } renderChange(renderContext, territoryColorMap)(maze.n, maze.m, i, j, cell)
+    } renderChange(renderContext, territoryColorMap)(cellH, cellW, i, j, cell)
+
+    (cellH, cellW)
   }
 
   def mazePerimeter(maze: Maze): Int = {
@@ -164,6 +178,8 @@ object MazeSolverUI {
     lazy val socket = new dom.WebSocket(serverUrlInput.value)
     var maze: Option[Maze] = None
     var territoryToColorCode = Map.empty[Int, String]
+    var cellH: Int = 0
+    var cellW: Int = 0
 
     // HTML event handlers
     connectButton.onclick = { _ =>
@@ -187,8 +203,12 @@ object MazeSolverUI {
           case "stage" :: mazeLines =>
             Maze.fromLines(mazeLines).foreach { generated =>
               maze = Some(generated)
-              renderMaze(renderContext, territoryToColorCode)(generated)
+              val (newCellH, newCellW) =
+                renderMaze(renderContext, territoryToColorCode)(generated)
+              cellW = newCellW
+              cellH = newCellH
               solveButton.disabled = false
+              generateButton.disabled = false
               showUnifiedTerritoriesButton.disabled = true
               territoryToColorCode = Map.empty
             }
@@ -203,8 +223,8 @@ object MazeSolverUI {
                       territoryToColorCode.updated(territory, newColor)
                   }
                   renderChange(renderContext, territoryToColorCode)(
-                    maze.n,
-                    maze.m,
+                    cellH,
+                    cellW,
                     i,
                     j,
                     cell
@@ -228,6 +248,7 @@ object MazeSolverUI {
                 showMessage(f.toString)
               case ExplorationFinished(equivalences) =>
                 showUnifiedTerritoriesButton.disabled = false
+                generateButton.disabled = false
 
                 territoryToColorCode = equivalences.map {
                   case (territory, parent) =>
@@ -245,6 +266,7 @@ object MazeSolverUI {
     }
 
     generateButton.onclick = { _ =>
+      generateButton.disabled = true
       val n = nInput.value
       val m = mInput.value
       val maxSteps = depthInput.value
@@ -254,6 +276,7 @@ object MazeSolverUI {
 
     solveButton.onclick = { _ =>
       maze.foreach { maze =>
+        generateButton.disabled = true
         solveButton.disabled = true
         val solveCommand = s"solve\n${maze.toString}\n"
         socket.send(solveCommand)
