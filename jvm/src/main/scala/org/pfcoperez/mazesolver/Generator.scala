@@ -4,9 +4,14 @@ import org.pfcoperez.mazesolver.datastructures.Maze
 
 import scala.util.Random
 import scala.annotation.tailrec
+import org.pfcoperez.mazesolver.datastructures.Maze.Claimed
 
 object Generator {
-  private case class AcidDroplet(position: (Int, Int), ttl: Int) {
+  private case class AcidDroplet(
+      position: (Int, Int),
+      door: (Int, Int),
+      ttl: Int
+  ) {
     def explorationOptions(state: Maze): Vector[AcidDroplet] = {
       val (i, j) = position
       Vector(
@@ -16,7 +21,7 @@ object Generator {
         (i, j + 1)
       ).collect {
         case p @ (i, j) if ttl > 1 && state.withinMaze(i, j) =>
-          AcidDroplet(p, ttl - 1)
+          AcidDroplet(p, door, ttl - 1)
       }
     }
   }
@@ -28,29 +33,46 @@ object Generator {
     val west = (0 until n).map(i => (i, 0))
     val north = (0 until m).map(j => (0, j))
 
-    val doors = List(east, south, west, north)
+    val walls = List(east, south, west, north)
+    val wallPositionsSet = walls.flatten.toSet
+
+    val doors = walls
       .flatMap { border =>
         Random.shuffle(border.toSeq).take(doorsPerSide)
       }
-      .map(AcidDroplet(_, trailDepth))
+      .map(pos => AcidDroplet(pos, pos, trailDepth))
 
     @tailrec
     def acidTrail(toExplore: List[AcidDroplet], state: Maze): Maze = {
 
       toExplore match {
-        case (current @ AcidDroplet((i, j), _)) :: remaining =>
+        case (current @ AcidDroplet((i, j), _, _)) :: remaining =>
           val updatedState = state.update(i, j)(Maze.Empty).getOrElse(state)
           val candidates = current.explorationOptions(state)
           val loadedCandidates = candidates
+            .filter { droplet =>
+              val (i, j) = droplet.position
+              !wallPositionsSet.contains(droplet.position)
+            }
             .sortBy { droplet =>
               val (i, j) = droplet.position
-              val (ci, cj) = (state.n / 2, state.m / 2)
-              (ci - i) * (ci - i) + (cj - j) * (cj - j)
-            }(implicitly[Ordering[Int]].reverse)
+              val (ci, cj) = droplet.door
+              Math
+                .sqrt(
+                  (ci - i).toDouble * (ci - i).toDouble + (cj - j).toDouble * (cj - j).toDouble
+                )
+            } /*(implicitly[Ordering[Int]].reverse)*/
             .zipWithIndex
-            .flatMap { case (candidate, idx) =>
-              List.fill(idx + 1)(candidate)
+            .flatMap { case (candidate @ AcidDroplet((ci, cj), _, _), idx) =>
+              val frequency = updatedState
+                .get(ci, cj)
+                .collect { case Maze.Empty =>
+                  1
+                }
+                .getOrElse(idx + 1)
+              List.fill(frequency)(candidate)
             }
+
           val nextToExplore = if (loadedCandidates.nonEmpty) {
             loadedCandidates(Random.nextInt(loadedCandidates.size)) :: remaining
           } else remaining
