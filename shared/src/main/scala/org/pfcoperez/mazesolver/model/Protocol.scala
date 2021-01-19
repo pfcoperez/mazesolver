@@ -13,7 +13,7 @@ object Protocol {
     private val GenerateRegex =
       "generate ([0-9]+) ([0-9]+) ([0-9]+) ([0-9]+)\n*".r
     private val SolveRegex =
-      """solve(\s[0-9]+)?""".r
+      """solve\s([0-9]+)(\s[0-9]+)?""".r
 
     def unapply(rawRequest: String): Option[Request] = {
       Some(rawRequest).flatMap {
@@ -24,14 +24,19 @@ object Protocol {
           )
         case solveStr: String =>
           val tokenized = solveStr.split("\n")
-          tokenized.headOption.flatMap { case SolveRegex(maybeMaxItsStr) =>
-            val maybeMaxIterations = for {
-              str <- Option(maybeMaxItsStr)
-              limit <- Try(str.trim.toInt).toOption
-            } yield limit
-            tokenized.tail.headOption.map { _ =>
-              Solve(tokenized.tail.mkString("\n"), maybeMaxIterations)
-            }
+          tokenized.headOption.flatMap {
+            case SolveRegex(initialTerritorySizeStr, maybeMaxItsStr) =>
+              val maybeMaxIterations = for {
+                str <- Option(maybeMaxItsStr)
+                limit <- Try(str.trim.toInt).toOption
+              } yield limit
+              tokenized.tail.headOption.map { _ =>
+                Solve(
+                  tokenized.tail.mkString("\n"),
+                  initialTerritorySizeStr.toInt,
+                  maybeMaxIterations
+                )
+              }
           }
       }
     }
@@ -43,6 +48,7 @@ object Protocol {
 
   case class Solve(
       maze: String,
+      initialTerritorySize: Int,
       maybeMaxIterations: Option[Int]
   ) extends Request
 

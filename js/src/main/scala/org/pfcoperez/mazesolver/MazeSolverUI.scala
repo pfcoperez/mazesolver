@@ -73,8 +73,10 @@ object MazeSolverUI {
     2 * (maze.n + maze.m)
   }
 
-  def generateTerritoryColor(maze: Maze)(territory: Int) = {
-    val perimeter = mazePerimeter(maze)
+  def generateTerritoryColor(maze: Maze, initialTerritorySize: Int)(
+      territory: Int
+  ) = {
+    val perimeter = mazePerimeter(maze) * initialTerritorySize
     val offset = 100
     val multiplier = 5
     ColorGenerator.generateHsl(
@@ -145,6 +147,14 @@ object MazeSolverUI {
     doorsInput.defaultValue = "2"
     controlPaneDiv.appendChild(doorsInput)
 
+    val initialTerritorySizeInput =
+      dom.document.createElement("input").asInstanceOf[Input]
+    initialTerritorySizeInput.`type` = "number"
+    initialTerritorySizeInput.max = "9999"
+    initialTerritorySizeInput.min = "1"
+    initialTerritorySizeInput.defaultValue = "1"
+    controlPaneDiv.appendChild(initialTerritorySizeInput)
+
     val generateButton =
       dom.document.createElement("button").asInstanceOf[Button]
     generateButton.textContent = "Generate"
@@ -196,6 +206,7 @@ object MazeSolverUI {
     var territoryToColorCode = Map.empty[Int, String]
     var cellH: Int = 0
     var cellW: Int = 0
+    var initialTerritorySize: Int = 1
 
     def setStage(mazeLines: List[String]): Unit = {
       Maze.fromLines(mazeLines).foreach { generated =>
@@ -238,7 +249,10 @@ object MazeSolverUI {
                 maze = maze.flatMap { maze =>
                   val cell = Claimed(territory)
                   territoryToColorCode.get(territory).map(_ => ()).getOrElse {
-                    val newColor = generateTerritoryColor(maze)(territory)
+                    val newColor =
+                      generateTerritoryColor(maze, initialTerritorySize)(
+                        territory
+                      )
                     territoryToColorCode =
                       territoryToColorCode.updated(territory, newColor)
                   }
@@ -256,7 +270,7 @@ object MazeSolverUI {
                   .get(territoryA)
                   .orElse(territoryToColorCode.get(territoryB))
                   .getOrElse {
-                    generateTerritoryColor(maze.get)(
+                    generateTerritoryColor(maze.get, initialTerritorySize)(
                       Math.min(territoryA, territoryB)
                     )
                   }
@@ -268,6 +282,7 @@ object MazeSolverUI {
                 showMessage(f.toString)
               case ExplorationFinished(equivalences) =>
                 showUnifiedTerritoriesButton.disabled = false
+                initialTerritorySizeInput.disabled = false
                 setCanGetNew(true)
 
                 territoryToColorCode = equivalences.map {
@@ -298,7 +313,9 @@ object MazeSolverUI {
       maze.foreach { maze =>
         setCanGetNew(false)
         solveButton.disabled = true
-        val solveCommand = s"solve\n${maze.toString}\n"
+        initialTerritorySizeInput.disabled = true
+        initialTerritorySize = initialTerritorySizeInput.value.toInt
+        val solveCommand = s"solve $initialTerritorySize\n${maze.toString}\n"
         socket.send(solveCommand)
       }
     }

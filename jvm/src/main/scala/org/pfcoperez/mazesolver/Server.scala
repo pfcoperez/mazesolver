@@ -123,7 +123,10 @@ object Server extends App {
       }
     }
 
-    val initialConditions = Solver.initialConditions(maze)(disjointSetsFactory)
+    val initialConditions =
+      Solver.initialConditions(maze, problem.initialTerritorySize)(
+        disjointSetsFactory
+      )
 
     println(
       s"INITIALIZED SOLVER ENGINE: ${initialConditions.territories.description}"

@@ -10,7 +10,10 @@ import org.pfcoperez.mazesolver.datastructures.DisjointSetsWrapper
 
 object Solver {
 
-  case class Solution(claimed: Maze, territories: DisjointSetsWrapper[Int])
+  case class Solution(
+      claimed: Maze,
+      territories: DisjointSetsWrapper[Int]
+  )
   case class Scout(position: (Int, Int), territory: Int) {
     assert(territory >= 0)
   }
@@ -90,8 +93,11 @@ object Solver {
   }
 
   def initialConditions(
-      input: Maze
-  )(disjointSetsFactory: Seq[Int] => DisjointSetsWrapper[Int]): StepResult = {
+      input: Maze,
+      simulatedTerritorySize: Int
+  )(
+      disjointSetsFactory: Seq[Int] => DisjointSetsWrapper[Int]
+  ): StepResult = {
 
     def isPosition(value: Maze.Cell) =
       (input.get _).tupled.andThen(_.exists(_ == value))
@@ -111,9 +117,22 @@ object Solver {
         (0 until (input.m - 1)).map(j => (0, j)).filter(isEmptyPosition)
 
       (eastDoors ++ southDoors ++ westDoors ++ northDoors).zipWithIndex.toMap
+        .mapValues(_ * simulatedTerritorySize)
     }
 
-    val initialTerritories = disjointSetsFactory(positionToDoor.values.toSeq)
+    val initialTerritories = positionToDoor.foldLeft(
+      disjointSetsFactory(
+        positionToDoor.values.toSeq.flatMap(realDoor =>
+          realDoor until (realDoor + simulatedTerritorySize)
+        )
+      )
+    ) { case (territories, ((i, j), door)) =>
+      ((door + 1) until (door + simulatedTerritorySize)).foldLeft(
+        territories
+      ) { case (territories, k) =>
+        territories.union(door, k)._1
+      }
+    }
 
     StepResult(
       initialTerritories,
