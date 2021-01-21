@@ -4,6 +4,7 @@ import org.scalajs.dom
 import org.scalajs.dom.experimental
 import org.scalajs.dom.html.{Button, Canvas, Input}
 import org.scalajs.dom.{CanvasRenderingContext2D => Ctx2D}
+import org.scalajs.dom.raw.MessageEvent
 
 import org.pfcoperez.mazesolver.datastructures.Maze
 import org.pfcoperez.mazesolver.model.Events._
@@ -11,9 +12,11 @@ import org.pfcoperez.mazesolver.datastructures.Maze.Claimed
 import org.pfcoperez.mazesolver.datastructures.Maze.Empty
 import org.pfcoperez.mazesolver.datastructures.Maze.Wall
 import org.pfcoperez.mazesolver.datastructures.Maze.Cell
-import org.scalajs.dom.raw.MessageEvent
+import org.pfcoperez.mazesolver.jsfacades.TonePlayer
 
 object MazeSolverUI {
+
+  val tonePlayer = new TonePlayer()
 
   def colorCode(
       territoryColorMap: Map[Int, String]
@@ -27,13 +30,24 @@ object MazeSolverUI {
 
   def renderChange(
       renderContext: Ctx2D,
-      territoryColorMap: Map[Int, String]
+      territoryColorMap: Map[Int, String],
+      territoryToneMap: Map[Int, Int]
   )(cellH: Int, cellW: Int, i: Int, j: Int, cell: Cell): Unit = {
     renderContext.fillStyle = colorCode(territoryColorMap)(cell)
     renderContext.fillRect(j * cellW, i * cellH, cellW, cellH)
+
+    cell match {
+      case Claimed(territory) =>
+        territoryToneMap.get(territory).foreach(tonePlayer.playTone(_))
+      case _ =>
+    }
   }
 
-  def renderMaze(renderContext: Ctx2D, territoryColorMap: Map[Int, String])(
+  def renderMaze(
+      renderContext: Ctx2D,
+      territoryColorMap: Map[Int, String],
+      territoryToneMap: Map[Int, Int]
+  )(
       maze: Maze
   ): (Int, Int) = {
 
@@ -64,7 +78,13 @@ object MazeSolverUI {
       i <- (0 until maze.n)
       j <- (0 until maze.m)
       cell <- maze.get(i, j)
-    } renderChange(renderContext, territoryColorMap)(cellH, cellW, i, j, cell)
+    } renderChange(renderContext, territoryColorMap, territoryToneMap)(
+      cellH,
+      cellW,
+      i,
+      j,
+      cell
+    )
 
     (cellH, cellW)
   }
@@ -73,16 +93,18 @@ object MazeSolverUI {
     2 * (maze.n + maze.m)
   }
 
-  def generateTerritoryColor(maze: Maze, initialTerritorySize: Int)(
+  def generateTerritoryColorAndTone(maze: Maze, initialTerritorySize: Int)(
       territory: Int
-  ) = {
+  ): (String, Int) = {
     val perimeter = mazePerimeter(maze) * initialTerritorySize
     val offset = 100
     val multiplier = 5
-    ColorGenerator.generateHsl(
-      (multiplier * (territory + offset)) % perimeter,
+    import ColorGenerator._
+    val spectrumPosition = (multiplier * (territory + offset)) % perimeter
+    generateHsl(
+      spectrumPosition,
       perimeter
-    )
+    ) -> generateToneFrequency(spectrumPosition, perimeter)
   }
 
   def main(args: Array[String]): Unit = {
@@ -204,6 +226,7 @@ object MazeSolverUI {
     lazy val socket = new dom.WebSocket(serverUrlInput.value)
     var maze: Option[Maze] = None
     var territoryToColorCode = Map.empty[Int, String]
+    var territoryToTone = Map.empty[Int, Int]
     var cellH: Int = 0
     var cellW: Int = 0
     var initialTerritorySize: Int = 1
@@ -212,7 +235,9 @@ object MazeSolverUI {
       Maze.fromLines(mazeLines).foreach { generated =>
         maze = Some(generated)
         val (newCellH, newCellW) =
-          renderMaze(renderContext, territoryToColorCode)(generated)
+          renderMaze(renderContext, territoryToColorCode, territoryToTone)(
+            generated
+          )
         cellW = newCellW
         cellH = newCellH
         solveButton.disabled = false
@@ -249,14 +274,20 @@ object MazeSolverUI {
                 maze = maze.flatMap { maze =>
                   val cell = Claimed(territory)
                   territoryToColorCode.get(territory).map(_ => ()).getOrElse {
-                    val newColor =
-                      generateTerritoryColor(maze, initialTerritorySize)(
+                    val (newColor, newTone) =
+                      generateTerritoryColorAndTone(maze, initialTerritorySize)(
                         territory
                       )
                     territoryToColorCode =
                       territoryToColorCode.updated(territory, newColor)
+                    territoryToTone =
+                      territoryToTone.updated(territory, newTone)
                   }
-                  renderChange(renderContext, territoryToColorCode)(
+                  renderChange(
+                    renderContext,
+                    territoryToColorCode,
+                    territoryToTone
+                  )(
                     cellH,
                     cellW,
                     i,
@@ -266,11 +297,23 @@ object MazeSolverUI {
                   maze.update(i, j)(cell)
                 }
               case f @ Fusion(territoryA, territoryB) =>
-                val commonColor = territoryToColorCode
+                val (commonColor, commonTone) = territoryToColorCode
                   .get(territoryA)
-                  .orElse(territoryToColorCode.get(territoryB))
+                  .flatMap(color =>
+                    territoryToTone.get(territoryA).map(color -> _)
+                  )
+                  .orElse(
+                    territoryToColorCode
+                      .get(territoryB)
+                      .flatMap(color =>
+                        territoryToTone.get(territoryB).map(color -> _)
+                      )
+                  )
                   .getOrElse {
-                    generateTerritoryColor(maze.get, initialTerritorySize)(
+                    generateTerritoryColorAndTone(
+                      maze.get,
+                      initialTerritorySize
+                    )(
                       Math.min(territoryA, territoryB)
                     )
                   }
@@ -278,6 +321,10 @@ object MazeSolverUI {
                 territoryToColorCode = territoryToColorCode
                   .updated(territoryA, commonColor)
                   .updated(territoryB, commonColor)
+
+                territoryToTone = territoryToTone
+                  .updated(territoryA, commonTone)
+                  .updated(territoryB, commonTone)
 
                 showMessage(f.toString)
               case ExplorationFinished(equivalences) =>
@@ -322,7 +369,7 @@ object MazeSolverUI {
 
     showUnifiedTerritoriesButton.onclick = { _ =>
       maze.foreach {
-        renderMaze(renderContext, territoryToColorCode)(_)
+        renderMaze(renderContext, territoryToColorCode, territoryToTone)(_)
       }
     }
 

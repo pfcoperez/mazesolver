@@ -9,4 +9,11 @@ object ColorGenerator {
     s"hsl($h, 100%, 72%)"
   }
 
+  def generateToneFrequency(n: Int, maxInRange: Int): Int = {
+    val minHz = 200
+    val maxHz = 1000
+    val offset = ((maxHz - minHz) * (n.toFloat / maxInRange.toFloat)).toInt
+    minHz + offset
+  }
+
 }

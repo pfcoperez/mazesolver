@@ -4,6 +4,20 @@
 </head>
 
 <body style="background-color: dimgrey;">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.3/Tone.js"></script>
+    <script type="text/javascript">
+        class TonePlayer {
+            constructor() {
+                this.synth = new Tone.Synth().toDestination();
+                this.playTone = function (freq) {
+                    try {
+                        this.synth.triggerAttackRelease(freq, "8n")
+                    } catch (err) {
+                    }
+                }
+            }
+        }
+    </script>
     <script type="text/javascript" src="./js/target/scala-2.12/mazesolver-fastopt.js"></script>
 </body>
 
