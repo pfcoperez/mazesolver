@@ -230,6 +230,7 @@ object MazeSolverUI {
     var cellH: Int = 0
     var cellW: Int = 0
     var initialTerritorySize: Int = 1
+    var timeOfFirstClaim: Option[Long] = None
 
     def setStage(mazeLines: List[String]): Unit = {
       Maze.fromLines(mazeLines).foreach { generated =>
@@ -271,6 +272,8 @@ object MazeSolverUI {
           case Event(event) :: _ =>
             event match {
               case Claim((i, j), territory) =>
+                timeOfFirstClaim =
+                  timeOfFirstClaim.orElse(Some(System.currentTimeMillis()))
                 maze = maze.flatMap { maze =>
                   val cell = Claimed(territory)
                   territoryToColorCode.get(territory).map(_ => ()).getOrElse {
@@ -337,7 +340,15 @@ object MazeSolverUI {
                     territory -> territoryToColorCode(parent)
                 }.toMap
 
-                showMessage("FINISHED")
+                val explorationDuration = timeOfFirstClaim.map { startedAt =>
+                  (System.currentTimeMillis() - startedAt) / 1000.0
+                }
+
+                timeOfFirstClaim = None
+
+                showMessage(
+                  s"FINISHED - ${explorationDuration.getOrElse("?")} s"
+                )
             }
           case other :: _ =>
             showMessage(other)
@@ -362,6 +373,7 @@ object MazeSolverUI {
         solveButton.disabled = true
         initialTerritorySizeInput.disabled = true
         initialTerritorySize = initialTerritorySizeInput.value.toInt
+        timeOfFirstClaim = None
         val solveCommand = s"solve $initialTerritorySize\n${maze.toString}\n"
         socket.send(solveCommand)
       }
