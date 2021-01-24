@@ -98,7 +98,7 @@ object MazeSolverUI {
   ): (String, Int) = {
     val perimeter = mazePerimeter(maze) * initialTerritorySize
     val offset = 100
-    val multiplier = 5
+    val multiplier = 100
     import ColorGenerator._
     val spectrumPosition = (multiplier * (territory + offset)) % perimeter
     generateHsl(

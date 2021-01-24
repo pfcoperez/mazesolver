@@ -10,6 +10,8 @@ object ColorGenerator {
   }
 
   def generateToneFrequency(n: Int, maxInRange: Int): Int = {
+    assert(n <= maxInRange)
+    assert(n >= 0)
     val minHz = 200
     val maxHz = 1000
     val offset = ((maxHz - minHz) * (n.toFloat / maxInRange.toFloat)).toInt
